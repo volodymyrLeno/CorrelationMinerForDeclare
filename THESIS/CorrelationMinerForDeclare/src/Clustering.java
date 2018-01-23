@@ -28,25 +28,29 @@ public final class Clustering {
             String split = getBestSplit(featureVectorList, attribute);
             if(tryParseDouble(split)){
                 Double value = Double.parseDouble(split);
-                partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) > value).
-                        collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).
-                        collect(Collectors.toList()), n);
+
                 partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) <= value).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " <= " + split)).
+                        collect(Collectors.toList()), n);
+
+                partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) > value).
+                        collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).
                         collect(Collectors.toList()), n);
             }
             else{
                 partitioning(featureVectorList.stream().filter(fv -> fv.to.get(attribute).equals(split)).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).
                         collect(Collectors.toList()), n);
+
                 partitioning(featureVectorList.stream().filter(fv -> !fv.to.get(attribute).equals(split)).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " != " + split)).
                         collect(Collectors.toList()), n);
             }
         }
-        else
+        else{
             partitions.add(featureVectorList);
             rules.add(rule);
+        }
     }
 
     public static double[][] constructDistanceMatrix(List<FeatureVector> featureVectorsList){

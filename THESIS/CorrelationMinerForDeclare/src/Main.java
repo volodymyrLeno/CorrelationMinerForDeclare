@@ -8,9 +8,7 @@ public class Main {
     public static void main(String[] args) {
         String csvFile = "C:/Volodymyr/PhD/TARTU/Simple Log.csv";
         HashMap<Integer, List<Event>> cases = readLog(csvFile);
-        //System.out.println(cases);
         List<Itemset> itemsets = frequentItemsetsMining(cases, 4);
-        //System.out.println(itemsets);
         HashMap<Itemset, List<FeatureVector>> featureVectors = extractFeatureVectors(cases, itemsets);
 
         getCorrelations(featureVectors);
@@ -147,22 +145,24 @@ public class Main {
     public static void getCorrelations(HashMap<Itemset, List<FeatureVector>> featureVectorLists){
         for(Itemset itemset: featureVectorLists.keySet()){
             System.out.println("\n" + itemset.items + "\n");
-            //System.out.println(featureVectorLists.get(itemset) + "\n");
+            System.out.println(featureVectorLists.get(itemset) + "\n");
             List<Cluster> clustersTo = Clustering.clustering(featureVectorLists.get(itemset),2);
             clustersTo.forEach(Cluster::giveLabels);
+
+            /*
             for(Cluster cluster: clustersTo){
                 System.out.println(cluster.rules);
-                System.out.println(cluster.elements);
+                System.out.println(cluster.elements + "\n");
             }
-            /*
+            */
+
             List<Cluster> clustersFrom = DecisionTree.id3(featureVectorLists.get(itemset));
 
             for (Cluster clusterTo : clustersTo) {
                 clustersFrom.stream().filter(clusterFrom -> clusterTo.label.equals(clusterFrom.label)).
                         forEach(clusterFrom -> System.out.println(clusterFrom.rules + " =>" + clusterTo.rules));
             }
-            */
+
         }
-        return;
     }
 }
