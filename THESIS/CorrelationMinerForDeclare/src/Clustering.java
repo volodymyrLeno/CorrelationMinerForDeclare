@@ -98,7 +98,6 @@ public final class Clustering {
         HashMap<String, Double> inhomogeneities = new HashMap<>();
         for(String key: featureVectorList.get(0).to.keySet()){
             inhomogeneities.put(key, computeInhomogeneity(featureVectorList, key));
-            //System.out.println(key + "  " + computeInhomogeneity(featureVectorList, key));
         }
 
         Map.Entry<String, Double> max = null;
@@ -134,7 +133,6 @@ public final class Clustering {
             for(String value: values){
                 double H1 = computeInhomogeneity(featureVectorList.stream().filter(fv -> fv.to.get(attribute).equals(value)).collect(Collectors.toList()), attribute);
                 double H2 = computeInhomogeneity(featureVectorList.stream().filter(fv -> !fv.to.get(attribute).equals(value)).collect(Collectors.toList()), attribute);
-                //System.out.println(H1 + H2 - Hd + "  " + "value: " + value);
                 if(deltaH < (H1 + H2 - Hd)){
                     deltaH = H1 + H2 - Hd;
                     bestSplit = value;

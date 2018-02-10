@@ -6,13 +6,13 @@ import java.util.List;
  */
 
 public class Event {
-    Integer caseID;
+    String caseID;
     String activityName;
     String timestamp;
     HashMap<String, String> payload;
 
     public Event(List<String> attributes, String[] values){
-        this.caseID = Integer.parseInt(values[0]);
+        this.caseID = values[0];
         this.activityName = values[1];
         this.timestamp = values[2];
         payload = new HashMap<>();
@@ -20,7 +20,7 @@ public class Event {
             payload.put(attributes.get(i), values[i]);
     }
 
-    public Event(Integer caseID, String activityName, String timestamp) {
+    public Event(String caseID, String activityName, String timestamp) {
         this.caseID = caseID;
         this.activityName = activityName;
         this.timestamp = timestamp;
@@ -31,7 +31,7 @@ public class Event {
         this.caseID = event.caseID;
         this.activityName = event.activityName;
         this.timestamp = event.timestamp;
-        payload = new HashMap<>();
+        this.payload = new HashMap<>(event.payload);
     }
 
     public String toString() {

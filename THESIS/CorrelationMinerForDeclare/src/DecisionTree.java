@@ -92,10 +92,11 @@ public final class DecisionTree {
 
     public static BestSplit getBestSplit(List<FeatureVector> featureVectorList){
         HashMap<String, String> split = new HashMap<>();
+        HashMap<String, Double> infGain = new HashMap<>();
         for(String attribute: featureVectorList.get(0).from.keySet()){
             List<String> values = featureVectorList.stream().map(fv -> fv.from.get(attribute)).distinct().collect(Collectors.toList());
 
-            double bestSplit = computeInformationGain(featureVectorList, attribute, values.get(0));
+        double bestSplit = computeInformationGain(featureVectorList, attribute, values.get(0));
             split.put(attribute, values.get(0));
             for(String value: values){
                 if(bestSplit < computeInformationGain(featureVectorList, attribute, value)){
@@ -103,9 +104,12 @@ public final class DecisionTree {
                     split.put(attribute, value);
                 }
             }
+            infGain.put(attribute, bestSplit);
         }
-        String bestAttribute = Collections.max(split.entrySet(), Map.Entry.comparingByValue()).getKey();
+
+        String bestAttribute = Collections.max(infGain.entrySet(), Map.Entry.comparingByValue()).getKey();
         String bestThreshold = split.get(bestAttribute);
+
         return new BestSplit(bestAttribute, bestThreshold);
     }
 
