@@ -12,18 +12,12 @@ public class Main {
 
         //System.out.println(cases);
 
-        //List<Itemset> itemsets = frequentItemsetsMining(cases, 4);
-        //System.out.println(itemsets);
-        //System.out.println("Total amount = " + itemsets.size());
-        //HashMap<Itemset, List<FeatureVector>> featureVectors = extractFeatureVectors(cases, itemsets);
-
-        //extractFeatureVectors(cases, 4, "chain precedence");
-        HashMap<Itemset, List<FeatureVector>> featureVectors = extractFeatureVectors(cases, 1, "alternate precedence");
+        HashMap<Itemset, List<FeatureVector>> featureVectors = extractFeatureVectors(cases, 1, "response");
 
         for(Itemset itemset: featureVectors.keySet())
             System.out.println(itemset);
 
-        getCorrelations(featureVectors, 2);
+        getCorrelations(featureVectors, 3);
     }
 
     public static HashMap<String, List<Event>> readLog(String path){
@@ -216,22 +210,7 @@ public class Main {
 
     public static HashMap<Itemset, List<FeatureVector>> getChainResponse(HashMap<String, List<Event>> cases, List<Itemset> itemsets,
                                                                       HashMap<Itemset, HashMap<String, List<Integer>>> index1, HashMap<Itemset, HashMap<String, List<Integer>>> index2){
-        HashMap<Itemset, List<FeatureVector>> featureVectors = new HashMap<>();
-        for(Itemset itemset: itemsets) {
-            List<FeatureVector> pattern = new ArrayList<>();
-            for(String key: cases.keySet()){
-                if (index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0) {
-                    for (Integer i1: index1.get(itemset).get(key))
-                        for (Integer i2: index2.get(itemset).get(key))
-                            if(i2 - i1 == 1) {
-                                pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
-                                break;
-                            }
-                }
-            }
-            featureVectors.put(itemset, pattern);
-        }
-        return featureVectors;
+        return getChainPrecedence(cases, itemsets, index2, index1);
     }
 
     public static HashMap<Itemset, List<FeatureVector>> getResponse(HashMap<String, List<Event>> cases, List<Itemset> itemsets,
@@ -318,11 +297,14 @@ public class Main {
         List<Correlation> correlations = new ArrayList<>();
         for(Itemset itemset: featureVectorLists.keySet()){
             System.out.println("\n" + itemset.items + "\n");
+
+            System.out.println(featureVectorLists.get(itemset) + "\n");
+
             /*
             for(FeatureVector fv: featureVectorLists.get(itemset))
                     System.out.println(fv);
             */
-            System.out.println(featureVectorLists.get(itemset) + "\n");
+
             List<Cluster> clustersTo = Clustering.clustering(featureVectorLists.get(itemset),clusterSize);
             clustersTo.forEach(Cluster::giveLabels);
 

@@ -26,6 +26,7 @@ public final class Clustering {
         if(featureVectorList.size() > n){
             String attribute = getBestAttribute(featureVectorList);
             String split = getBestSplit(featureVectorList, attribute);
+
             if(tryParseDouble(split)){
                 Double value = Double.parseDouble(split);
 
@@ -38,6 +39,7 @@ public final class Clustering {
                         collect(Collectors.toList()), n);
             }
             else{
+
                 partitioning(featureVectorList.stream().filter(fv -> fv.to.get(attribute).equals(split)).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).
                         collect(Collectors.toList()), n);
@@ -156,7 +158,11 @@ public final class Clustering {
     }
 
     public static double computeDistance(double value1, double value2, double max, double min){
-        return (Math.abs(value1 - value2))/(max - min);
+        double value = (Math.abs(value1 - value2))/(max - min);
+        if(Double.isNaN(value))
+            return 0.0;
+        else
+            return value;
     }
 
     public static double computeDistance(Boolean value1, Boolean value2){
@@ -166,7 +172,11 @@ public final class Clustering {
 
     public static double computeDistance(String value1, String value2){
         Integer maxEditDistance = Math.max(value1.length(), value2.length());
-        return (double)calculateEditDistance(value1, value2)/maxEditDistance;
+        double value = (double)calculateEditDistance(value1, value2)/maxEditDistance;
+        if(Double.isNaN(value))
+            return 0.0;
+        else
+            return value;
     }
 
     public static Integer calculateEditDistance(String value1, String value2){
@@ -218,6 +228,14 @@ public final class Clustering {
             return true;
         } catch (NumberFormatException e){
             return false;
+        }
+    }
+
+    public static void printMatrix(double[][] matrix){
+        for(int i = 0; i < matrix.length; i++){
+            for(int j = 0; j < matrix.length; j++)
+                System.out.print(matrix[i][j] + " ");
+            System.out.println();
         }
     }
 }
