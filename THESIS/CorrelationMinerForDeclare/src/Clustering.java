@@ -202,10 +202,10 @@ public final class Clustering {
 
     public static double getMaxValue(double[][] matrix){
         double maxValue = matrix[0][0];
-        for (int j = 0; j < matrix.length; j++) {
-            for (int i = 0; i < matrix[j].length; i++) {
-                if (matrix[j][i] > maxValue) {
-                    maxValue = matrix[j][i];
+        for (double[] aMatrix : matrix) {
+            for (double anAMatrix : aMatrix) {
+                if (anAMatrix > maxValue) {
+                    maxValue = anAMatrix;
                 }
             }
         }
@@ -232,9 +232,9 @@ public final class Clustering {
     }
 
     public static void printMatrix(double[][] matrix){
-        for(int i = 0; i < matrix.length; i++){
-            for(int j = 0; j < matrix.length; j++)
-                System.out.print(matrix[i][j] + " ");
+        for (double[] aMatrix : matrix) {
+            for (int j = 0; j < matrix.length; j++)
+                System.out.print(aMatrix[j] + " ");
             System.out.println();
         }
     }

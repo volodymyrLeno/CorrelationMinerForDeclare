@@ -6,16 +6,18 @@ import java.util.*;
 public class Main {
 
     public static void main(String[] args) {
-        String csvFile = "C:/Volodymyr/PhD/TARTU/Log.csv";
+        String csvFile = "C:/Volodymyr/PhD/TARTU/Simple Log.csv";
         //String csvFile = "C:/Volodymyr/PhD/TARTU/B.csv";
         HashMap<String, List<Event>> cases = readLog(csvFile);
 
         //System.out.println(cases);
 
-        HashMap<Itemset, List<FeatureVector>> featureVectors = extractFeatureVectors(cases, 1, "response");
+        HashMap<Itemset, List<FeatureVector>> featureVectors = extractFeatureVectors(cases, 4, "chain response");
 
         for(Itemset itemset: featureVectors.keySet())
             System.out.println(itemset);
+
+        Summary.getCoverage(cases, featureVectors, "chain response");
 
         getCorrelations(featureVectors, 3);
     }
@@ -94,45 +96,48 @@ public class Main {
                     idx2.put(key, id2);
 
                     if(id1.size() > 0 && id2.size() > 0){
-                        if(ruleType.equals("precedence") || ruleType.equals("chain precedence"))
-                        {
-                            for(Integer i2: id2)
-                                for(Integer i1: id1)
-                                    if((ruleType.equals("precedence") && i2 > i1) || (ruleType.equals("chain precedence") && (i2 - i1 == 1))){
+                        switch (ruleType) {
+                            case "precedence":
+                            case "chain precedence":
+                                for (Integer i2 : id2)
+                                    for (Integer i1 : id1)
+                                        if ((ruleType.equals("precedence") && i2 > i1) || (ruleType.equals("chain precedence") && (i2 - i1 == 1))) {
+                                            itemset.increaseFrequency();
+                                            break;
+                                        }
+                                break;
+                            case "response":
+                            case "chain response":
+                                for (Integer i1 : id1)
+                                    for (Integer i2 : id2)
+                                        if ((ruleType.equals("response") && i2 > i1) || (ruleType.equals("chain response") && (i2 - i1 == 1))) {
+                                            itemset.increaseFrequency();
+                                            break;
+                                        }
+                                break;
+                            case "responded existence":
+                                for (Integer i1 : id1)
+                                    for (Integer i2 : id2) {
                                         itemset.increaseFrequency();
                                         break;
                                     }
-                        }
-                        else if(ruleType.equals("response") || ruleType.equals("chain response")){
-                            for(Integer i1: id1)
-                                for(Integer i2: id2)
-                                    if((ruleType.equals("response") && i2 > i1) || (ruleType.equals("chain response") && (i2 - i1 == 1))){
-                                        itemset.increaseFrequency();
-                                        break;
-                                    }
-                        }
-                        else if(ruleType.equals("responded existence")){
-                            for(Integer i1: id1)
-                                for(Integer i2: id2){
-                                    itemset.increaseFrequency();
-                                    break;
-                                }
-                        }
-                        else if(ruleType.equals("alternate response")){
-                            for(Integer i1: id1)
-                                for(Integer i2: id2)
-                                    if(i2 > i1 && id1.stream().noneMatch(el -> el > i1 && el < i2)){
-                                        itemset.increaseFrequency();
-                                        break;
-                                    }
-                        }
-                        else if(ruleType.equals("alternate precedence")){
-                            for(Integer i2: id2)
-                                for(Integer i1: id1)
-                                    if(i2 > i1 && id2.stream().noneMatch(el -> el > i1 && el < i2)){
-                                        itemset.increaseFrequency();
-                                        break;
-                                    }
+                                break;
+                            case "alternate response":
+                                for (Integer i1 : id1)
+                                    for (Integer i2 : id2)
+                                        if (i2 > i1 && id1.stream().noneMatch(el -> el > i1 && el < i2)) {
+                                            itemset.increaseFrequency();
+                                            break;
+                                        }
+                                break;
+                            case "alternate precedence":
+                                for (Integer i2 : id2)
+                                    for (Integer i1 : id1)
+                                        if (i2 > i1 && id2.stream().noneMatch(el -> el > i1 && el < i2)) {
+                                            itemset.increaseFrequency();
+                                            break;
+                                        }
+                                break;
                         }
                     }
                 }
@@ -144,12 +149,11 @@ public class Main {
             List<Itemset> newItemsets = new ArrayList<>();
             for(int i = 0; i < itemsets.size(); i++)
             {
-                for(int j = 0; j < itemsets.size(); j++)
-                    if(i!=j){
-                        List<String> merge = new ArrayList<>(itemsets.get(i).items);
-                        merge.addAll(itemsets.get(j).items);
-                        newItemsets.add(new Itemset(merge, 0));
-                    }
+                for (Itemset itemset : itemsets) {
+                    List<String> merge = new ArrayList<>(itemsets.get(i).items);
+                    merge.addAll(itemset.items);
+                    newItemsets.add(new Itemset(merge, 0));
+                }
             }
             if(counter < 2)
                 itemsets = new ArrayList<>(newItemsets);
@@ -191,18 +195,16 @@ public class Main {
         HashMap<Itemset, List<FeatureVector>> featureVectors = new HashMap<>();
         for(Itemset itemset: itemsets) {
             List<FeatureVector> pattern = new ArrayList<>();
-            for(String key: cases.keySet()){
-                if (index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0) {
-                    List<Integer> idx1 = index1.get(itemset).get(key);
-                    Collections.reverse(idx1);
-                    for (Integer i2: index2.get(itemset).get(key))
-                        for (Integer i1: idx1)
-                            if (i2 > i1) {
-                                pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
-                                break;
-                            }
-                }
-            }
+            cases.keySet().stream().filter(key -> index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0).forEach(key -> {
+                List<Integer> idx1 = index1.get(itemset).get(key);
+                Collections.reverse(idx1);
+                for (Integer i2 : index2.get(itemset).get(key))
+                    for (Integer i1 : idx1)
+                        if (i2 > i1) {
+                            pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                            break;
+                        }
+            });
             featureVectors.put(itemset, pattern);
         }
         return featureVectors;
@@ -210,7 +212,21 @@ public class Main {
 
     public static HashMap<Itemset, List<FeatureVector>> getChainResponse(HashMap<String, List<Event>> cases, List<Itemset> itemsets,
                                                                       HashMap<Itemset, HashMap<String, List<Integer>>> index1, HashMap<Itemset, HashMap<String, List<Integer>>> index2){
-        return getChainPrecedence(cases, itemsets, index2, index1);
+        HashMap<Itemset, List<FeatureVector>> featureVectors = new HashMap<>();
+        for(Itemset itemset: itemsets) {
+            List<FeatureVector> pattern = new ArrayList<>();
+            cases.keySet().stream().filter(key -> index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0).forEach(key -> {
+                for (Integer i1 : index1.get(itemset).get(key))
+                    for (Integer i2 : index2.get(itemset).get(key))
+                        if (i2 - i1 == 1) {
+                            pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                            break;
+                        }
+            });
+            featureVectors.put(itemset, pattern);
+        }
+        return featureVectors;
+        //return getChainPrecedence(cases, itemsets, index2, index1);
     }
 
     public static HashMap<Itemset, List<FeatureVector>> getResponse(HashMap<String, List<Event>> cases, List<Itemset> itemsets,
@@ -218,16 +234,14 @@ public class Main {
         HashMap<Itemset, List<FeatureVector>> featureVectors = new HashMap<>();
         for(Itemset itemset: itemsets) {
             List<FeatureVector> pattern = new ArrayList<>();
-            for(String key: cases.keySet()){
-                if (index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0) {
-                    for (Integer i1: index1.get(itemset).get(key))
-                        for (Integer i2: index2.get(itemset).get(key))
-                            if(i2 > i1) {
-                                pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
-                                break;
-                            }
-                }
-            }
+            cases.keySet().stream().filter(key -> index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0).forEach(key -> {
+                for (Integer i1 : index1.get(itemset).get(key))
+                    for (Integer i2 : index2.get(itemset).get(key))
+                        if (i2 > i1) {
+                            pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                            break;
+                        }
+            });
             featureVectors.put(itemset, pattern);
         }
         return featureVectors;
@@ -238,14 +252,13 @@ public class Main {
         HashMap<Itemset, List<FeatureVector>> featureVectors = new HashMap<>();
         for(Itemset itemset: itemsets) {
             List<FeatureVector> pattern = new ArrayList<>();
-            for(String key: cases.keySet()){
-                if(index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0)
-                    for(Integer i1: index1.get(itemset).get(key))
-                        for(Integer i2: index2.get(itemset).get(key)){
-                            pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
-                            break;
-                        }
-            }
+            cases.keySet().stream().filter(key -> index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0).forEach(key -> {
+                for (Integer i1 : index1.get(itemset).get(key))
+                    for (Integer i2 : index2.get(itemset).get(key)) {
+                        pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                        break;
+                    }
+            });
             featureVectors.put(itemset, pattern);
         }
         return featureVectors;
@@ -256,16 +269,14 @@ public class Main {
         HashMap<Itemset, List<FeatureVector>> featureVectors = new HashMap<>();
         for(Itemset itemset: itemsets) {
             List<FeatureVector> pattern = new ArrayList<>();
-            for(String key: cases.keySet()){
-                if (index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0) {
-                    for (Integer i1: index1.get(itemset).get(key))
-                        for (Integer i2: index2.get(itemset).get(key))
-                            if(i2 > i1 && index1.get(itemset).get(key).stream().noneMatch(el -> el > i1 && el < i2)) {
-                                pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
-                                break;
-                            }
-                }
-            }
+            cases.keySet().stream().filter(key -> index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0).forEach(key -> {
+                for (Integer i1 : index1.get(itemset).get(key))
+                    for (Integer i2 : index2.get(itemset).get(key))
+                        if (i2 > i1 && index1.get(itemset).get(key).stream().noneMatch(el -> el > i1 && el < i2)) {
+                            pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                            break;
+                        }
+            });
             featureVectors.put(itemset, pattern);
         }
         return featureVectors;
@@ -276,18 +287,16 @@ public class Main {
         HashMap<Itemset, List<FeatureVector>> featureVectors = new HashMap<>();
         for(Itemset itemset: itemsets) {
             List<FeatureVector> pattern = new ArrayList<>();
-            for(String key: cases.keySet()){
-                if (index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0) {
-                    List<Integer> idx1 = index1.get(itemset).get(key);
-                    Collections.reverse(idx1);
-                    for (Integer i2: index2.get(itemset).get(key))
-                        for (Integer i1: idx1)
-                            if (i2 > i1 && index2.get(itemset).get(key).stream().noneMatch(el -> el > i1 && el < i2)) {
-                                pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
-                                break;
-                            }
-                }
-            }
+            cases.keySet().stream().filter(key -> index1.get(itemset).get(key).size() > 0 && index2.get(itemset).get(key).size() > 0).forEach(key -> {
+                List<Integer> idx1 = index1.get(itemset).get(key);
+                Collections.reverse(idx1);
+                for (Integer i2 : index2.get(itemset).get(key))
+                    for (Integer i1 : idx1)
+                        if (i2 > i1 && index2.get(itemset).get(key).stream().noneMatch(el -> el > i1 && el < i2)) {
+                            pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                            break;
+                        }
+            });
             featureVectors.put(itemset, pattern);
         }
         return featureVectors;
@@ -300,40 +309,20 @@ public class Main {
 
             System.out.println(featureVectorLists.get(itemset) + "\n");
 
-            /*
-            for(FeatureVector fv: featureVectorLists.get(itemset))
-                    System.out.println(fv);
-            */
-
             List<Cluster> clustersTo = Clustering.clustering(featureVectorLists.get(itemset),clusterSize);
             clustersTo.forEach(Cluster::giveLabels);
 
-            /*
-            for(Cluster cluster: clustersTo){
-                System.out.println(cluster.rules);
-                System.out.println(cluster.elements + "\n");
-            }
-            */
-
             List<Cluster> clustersFrom = DecisionTree.id3(featureVectorLists.get(itemset));
 
-            /*
-            for(Cluster cluster: clustersFrom){
-                System.out.println(cluster.rules);
-                System.out.println(cluster.elements + "\n");
-            }
-            */
-
             for(Cluster clusterTo: clustersTo)
-                for(Cluster clusterFrom: clustersFrom){
-                    if(clusterFrom.label.equals(clusterTo.label)){
-                        Correlation correlation = new Correlation(itemset, clusterFrom.rules, clusterTo.rules);
-                        //if(correlation.getConfidence(featureVectorLists.get(itemset)) > threshold){
-                        correlations.add(correlation);
-                        System.out.println(clusterFrom.rules + " => " + clusterTo.rules + " conf = " + correlation.getConfidence(featureVectorLists.get(itemset)));
-                        //}
-                    }
-                }
+                clustersFrom.stream().filter(clusterFrom -> clusterFrom.label.equals(clusterTo.label)).forEach(clusterFrom -> {
+                    Correlation correlation = new Correlation(itemset, clusterFrom.rules, clusterTo.rules);
+                    correlations.add(correlation);
+                    System.out.println(correlation.antecedent + " => " + correlation.consequent + " sup = " + String.format("%.2f", correlation.getSupport(featureVectorLists.get(itemset))));
+                });
         }
+        //Summary.consequentAttributes(correlations);
+        Summary.patternLength(correlations);
+        //Summary.antecedentInfo(correlations);
     }
 }

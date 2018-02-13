@@ -21,8 +21,12 @@ public class Correlation {
     }
 
     public Double getConfidence(List<FeatureVector> featureVectorList){
-        List<FeatureVector> coverSet = featureVectorList.stream().filter(fv -> satisfyAntecedent(fv)).collect(Collectors.toList());
-        return (double)coverSet.stream().filter(fv -> satisfyConsequent(fv)).count()/coverSet.size();
+        List<FeatureVector> coverSet = featureVectorList.stream().filter(this::satisfyAntecedent).collect(Collectors.toList());
+        return (double)coverSet.stream().filter(this::satisfyConsequent).count()/coverSet.size();
+    }
+
+    public Double getSupport(List<FeatureVector> featureVectorList){
+        return (double)featureVectorList.stream().filter(fv -> satisfyAntecedent(fv) && satisfyConsequent(fv)).collect(Collectors.toList()).size()/featureVectorList.size();
     }
 
     public boolean satisfyAntecedent(FeatureVector featureVector){
