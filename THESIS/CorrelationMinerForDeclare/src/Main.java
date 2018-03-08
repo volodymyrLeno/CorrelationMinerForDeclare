@@ -1,25 +1,61 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class Main {
 
+    static HashMap<Itemset, List<FeatureVector>> fulfillments = new HashMap<>();
+    static HashMap<Itemset, List<FeatureVector>> violations = new HashMap<>();
+
     public static void main(String[] args) {
-        String csvFile = "C:/Volodymyr/PhD/TARTU/Simple Log.csv";
-        //String csvFile = "C:/Volodymyr/PhD/TARTU/B.csv";
+        String csvFile = args[0];
+        String[] rules = args[1].split("[,;]");
+        List<String> rulesList = new ArrayList<>();
+        Collections.addAll(rulesList, rules);
+        Integer absoluteSupportThreshold = Integer.parseInt(args[2]);
+        Double relativeSupportThreshold = Double.parseDouble(args[3]);
+
         HashMap<String, List<Event>> cases = readLog(csvFile);
+        for(String rule: rulesList){
+            fulfillments = extractFeatureVectors(cases, absoluteSupportThreshold, rule);
+            List<Itemset> itemsets = fulfillments.keySet().stream().collect(Collectors.toList());
 
-        //System.out.println(cases);
+            violations = extractViolations(cases, itemsets, rule);
 
-        HashMap<Itemset, List<FeatureVector>> featureVectors = extractFeatureVectors(cases, 4, "chain response");
+            for(Itemset itemset: fulfillments.keySet())
+            {
+                if(fulfillments.get(itemset) != null && fulfillments.get(itemset).get(0).from.size() > 0 && fulfillments.get(itemset).get(0).to.size() > 0){
+                    if(itemset.items.get(0).equals("SubmitLoanApplication") && itemset.items.get(1).equals("AssessApplication")){
 
-        for(Itemset itemset: featureVectors.keySet())
-            System.out.println(itemset);
+                        System.out.println("\n" + rule + " " + itemset.items + "\n");
 
-        Summary.getCoverage(cases, featureVectors, "chain response");
+                        //Clustering.constructDistanceMatrix(fulfillments.get(itemset));
 
-        getCorrelations(featureVectors, 3);
+                        long startTime = System.currentTimeMillis();
+                        List<Correlation> correlations = Clustering.getCorrelations(itemset, fulfillments.get(itemset), violations.get(itemset), relativeSupportThreshold, rule);
+                        long stopTime = System.currentTimeMillis();
+                        double elapsedTime = (double)(stopTime - startTime)/1000;
+
+                        List<FeatureVector> featureVectorsList = new ArrayList<FeatureVector>() { { addAll(fulfillments.get(itemset));
+                            addAll(violations.get(itemset)); } };
+
+                        for(Correlation correlation: correlations)
+                            if(Summary.getRelativeSupport(cases, featureVectorsList, correlation) >= 0.1)
+                                //if(Summary.getRelativeSupport(cases, featureVectorsList, correlation) > 0.1 && Summary.getConfidence(cases, featureVectorsList, correlation) > 0.7)
+                                System.out.println(correlation + ", sup = " + Summary.getRelativeSupport(cases, featureVectorsList, correlation)
+                                        + ", conf = " + Summary.getConfidence(cases, featureVectorsList, correlation));
+                        System.out.println("Execution time = " + elapsedTime + "s");
+                        System.out.println("Number of correlations - " + correlations.size());
+                    }
+                }
+            }
+        }
+
     }
 
     public static HashMap<String, List<Event>> readLog(String path){
@@ -32,6 +68,7 @@ public class Main {
         try (BufferedReader br = new BufferedReader(new FileReader(path))) {
 
             while ((line = br.readLine()) != null) {
+
                 String[] row = line.split("[,;]");
                 if(counter == 0) {
                     counter++;
@@ -54,6 +91,52 @@ public class Main {
         }
 
         return cases;
+    }
+
+    public static HashMap<Itemset, List<FeatureVector>> extractViolations(HashMap<String, List<Event>> cases, List<Itemset> itemsets, String ruleType){
+        HashMap<Itemset, List<FeatureVector>> violations = new HashMap<>();
+        for(Itemset itemset: itemsets){
+            List<FeatureVector> pattern = new ArrayList<>();
+            for(String caseID: cases.keySet()){
+                List<Integer> id1 = new ArrayList<>();
+                List<Integer> id2 = new ArrayList<>();
+                int k = 0;
+                for(Event event: cases.get(caseID)){
+                    if (itemset.items.get(0).equals(event.activityName)) id1.add(k);
+                    if (itemset.items.get(1).equals(event.activityName)) id2.add(k);
+                    k++;
+                }
+                switch (ruleType){
+                    case "response":
+                        for(Integer i: id1)
+                            if(id2.stream().noneMatch(el -> el > i))
+                                pattern.add(new FeatureVector(cases.get(caseID).get(i).payload, null));
+                        break;
+                    case "chain response":
+                        for(Integer i: id1)
+                            if(id2.stream().noneMatch(el -> el - i == 1))
+                                pattern.add(new FeatureVector(cases.get(caseID).get(i).payload, null));
+                        break;
+                    case "precedence":
+                        for(Integer i: id2)
+                            if(id1.stream().noneMatch(el -> el < i))
+                                pattern.add(new FeatureVector(cases.get(caseID).get(i).payload, null));
+                        break;
+                    case "chain precedence":
+                        for(Integer i: id2)
+                            if(id1.stream().noneMatch(el -> i - el == 1))
+                                pattern.add(new FeatureVector(cases.get(caseID).get(i).payload, null));
+                        break;
+                    case "responded existence":
+                        if(id2.size() == 0)
+                            for(Integer i: id1)
+                                pattern.add(new FeatureVector(cases.get(caseID).get(i).payload, null));
+                        break;
+                }
+            }
+            violations.put(itemset, pattern);
+        }
+        return violations;
     }
 
     public static HashMap<Itemset, List<FeatureVector>> extractFeatureVectors(HashMap<String, List<Event>> cases, Integer threshold, String ruleType){
@@ -180,7 +263,8 @@ public class Main {
                     for (Integer i2: index2.get(itemset).get(key))
                         for (Integer i1: index1.get(itemset).get(key))
                             if (i2 - i1 == 1) {
-                                pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                                pattern.add(new FeatureVector(cases.get(key).get(i2), cases.get(key).get(i1)));
+                                //pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
                                 break;
                             }
                 }
@@ -201,7 +285,8 @@ public class Main {
                 for (Integer i2 : index2.get(itemset).get(key))
                     for (Integer i1 : idx1)
                         if (i2 > i1) {
-                            pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                            pattern.add(new FeatureVector((cases.get(key).get(i2)), cases.get(key).get(i1)));
+                            //pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
                             break;
                         }
             });
@@ -293,36 +378,13 @@ public class Main {
                 for (Integer i2 : index2.get(itemset).get(key))
                     for (Integer i1 : idx1)
                         if (i2 > i1 && index2.get(itemset).get(key).stream().noneMatch(el -> el > i1 && el < i2)) {
-                            pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
+                            pattern.add(new FeatureVector(cases.get(key).get(i2), cases.get(key).get(i1)));
+                            //pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
                             break;
                         }
             });
             featureVectors.put(itemset, pattern);
         }
         return featureVectors;
-    }
-
-    public static void getCorrelations(HashMap<Itemset, List<FeatureVector>> featureVectorLists, Integer clusterSize){
-        List<Correlation> correlations = new ArrayList<>();
-        for(Itemset itemset: featureVectorLists.keySet()){
-            System.out.println("\n" + itemset.items + "\n");
-
-            System.out.println(featureVectorLists.get(itemset) + "\n");
-
-            List<Cluster> clustersTo = Clustering.clustering(featureVectorLists.get(itemset),clusterSize);
-            clustersTo.forEach(Cluster::giveLabels);
-
-            List<Cluster> clustersFrom = DecisionTree.id3(featureVectorLists.get(itemset));
-
-            for(Cluster clusterTo: clustersTo)
-                clustersFrom.stream().filter(clusterFrom -> clusterFrom.label.equals(clusterTo.label)).forEach(clusterFrom -> {
-                    Correlation correlation = new Correlation(itemset, clusterFrom.rules, clusterTo.rules);
-                    correlations.add(correlation);
-                    System.out.println(correlation.antecedent + " => " + correlation.consequent + " sup = " + String.format("%.2f", correlation.getSupport(featureVectorLists.get(itemset))));
-                });
-        }
-        //Summary.consequentAttributes(correlations);
-        Summary.patternLength(correlations);
-        //Summary.antecedentInfo(correlations);
     }
 }

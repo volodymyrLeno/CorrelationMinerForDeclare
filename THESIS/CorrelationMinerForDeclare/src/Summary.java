@@ -1,4 +1,6 @@
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -151,5 +153,60 @@ public final class Summary {
             }
         }
         return frequency;
+    }
+
+    static double getRelativeSupport(HashMap<String, List<Event>> cases, List<FeatureVector> featureVectorList, Correlation correlation){
+        Integer activationFrequency = 0;
+        for(String caseID: cases.keySet()){
+            for(Event event: cases.get(caseID))
+                if(event.activityName.equals(correlation.from))
+                    activationFrequency++;
+        }
+        if(correlation.consequent.get(0).equals("-"))
+            return(double)featureVectorList.stream().filter(fv -> ruleSatisfaction(fv.from, correlation.antecedent) && fv.to == null).collect(Collectors.toList()).size()/activationFrequency;
+        else
+            return (double)featureVectorList.stream().filter(fv -> fv.from != null && fv.to != null).filter(fv -> ruleSatisfaction(fv.from, correlation.antecedent) &&
+                ruleSatisfaction(fv.to, correlation.consequent)).collect(Collectors.toList()).size()/activationFrequency;
+    }
+
+    static double getConfidence(HashMap<String, List<Event>> cases, List<FeatureVector> featureVectorList, Correlation correlation){
+        List<Event> activations = new ArrayList<>();
+        for(String caseID: cases.keySet()){
+            for(Event event: cases.get(caseID))
+                if(event.activityName.equals(correlation.from))
+                    activations.add(event);
+        }
+        Integer coverage = activations.stream().filter(fv -> ruleSatisfaction(fv.payload, correlation.antecedent)).collect(Collectors.toList()).size();
+        Integer ruleFrequency = 0;
+        if(correlation.consequent.get(0).equals("-"))
+            ruleFrequency = featureVectorList.stream().filter(fv -> ruleSatisfaction(fv.from, correlation.antecedent) &&
+                    fv.to == null).collect(Collectors.toList()).size();
+        else
+            ruleFrequency = featureVectorList.stream().filter(fv -> fv.from != null && fv.to != null).filter(fv -> ruleSatisfaction(fv.from, correlation.antecedent) &&
+                    ruleSatisfaction(fv.to, correlation.consequent)).collect(Collectors.toList()).size();
+
+        return (double)ruleFrequency/coverage;
+    }
+
+    static boolean ruleSatisfaction(HashMap<String, String> payload, List<String> rules){
+        for(String rule: rules){
+            Pattern pattern = Pattern.compile("[<!>=]+");
+            Matcher matcher = pattern.matcher(rule);
+            String operator = "";
+            if(matcher.find())
+                operator = matcher.group();
+
+            String[] params = rule.split("\\s[<!>=]+\\s");
+            String attribute = params[0];
+            String value = params[1];
+            switch(operator){
+                case "=": if(!payload.get(attribute).equals(value)) return false; break;
+                case "!=": if(payload.get(attribute).equals(value)) return  false; break;
+                case ">": if(Double.parseDouble(payload.get(attribute)) <= Double.parseDouble(value)) return false; break;
+                case "<=": if(Double.parseDouble(payload.get(attribute)) > Double.parseDouble((value))) return false; break;
+                default: break;
+            }
+        }
+        return true;
     }
 }

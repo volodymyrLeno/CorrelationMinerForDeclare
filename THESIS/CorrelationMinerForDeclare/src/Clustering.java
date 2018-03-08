@@ -11,56 +11,226 @@ public final class Clustering {
     public static List<List<FeatureVector>> partitions = new ArrayList<>();
     public static List<List<String>> rules = new ArrayList<>();
 
-    public static List<Cluster> clustering(List<FeatureVector> featureVectorList, Integer n){
+    public static HashMap<String, Double> attrMax = new HashMap<>();
+    public static HashMap<String, Double> attrMin = new HashMap<>();
+    public static HashMap<StringPair, Double> editDistances = new HashMap<>();
+
+    public static List<Cluster> clusters = new ArrayList<>();
+
+    public static void split(List<Cluster> clusterList, Double supportThreshold, Integer totalAmount){
+        for(Cluster cluster: clusterList)
+        {
+            String attribute = getBestAttribute(cluster.elements);
+            Split split = getBestSplit(cluster.elements, attribute);
+
+            if((double)cluster.elements.size()/totalAmount > supportThreshold && split.gain > 0.0){
+                cluster.clusterType = "-";
+                if(tryParseDouble(split.value)){
+                    Double value = Double.parseDouble(split.value);
+
+                    List<FeatureVector> subset1 = cluster.elements.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) <= value).
+                            collect(Collectors.toList());
+                    List<FeatureVector> subset2 = cluster.elements.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) > value).
+                            collect(Collectors.toList());
+                    clusters.add(new Cluster(Integer.toString(Integer.parseInt((clusters.stream().max(Comparator.comparing(c -> c.label))).get().label) + 1),
+                            Stream.concat(cluster.rules.stream(), Stream.of(attribute + " <= " + split.value)).collect(Collectors.toList()), subset1, "Leaf"));
+                    clusters.add(new Cluster(Integer.toString(Integer.parseInt((clusters.stream().max(Comparator.comparing(c -> c.label))).get().label) + 1),
+                            Stream.concat(cluster.rules.stream(), Stream.of(attribute + " > " + split.value)).collect(Collectors.toList()), subset2, "Leaf"));
+                }
+                else{
+                    List<FeatureVector> subset1 = cluster.elements.stream().filter(fv -> fv.to.get(attribute).equals(split.value)).collect(Collectors.toList());
+                    List<FeatureVector> subset2 = cluster.elements.stream().filter(fv -> !fv.to.get(attribute).equals(split.value)).collect(Collectors.toList());
+
+                    clusters.add(new Cluster(Integer.toString(Integer.parseInt((clusters.stream().max(Comparator.comparing(c -> c.label))).get().label) + 1),
+                            Stream.concat(cluster.rules.stream(), Stream.of(attribute + " = " + split.value)).collect(Collectors.toList()), subset1, "Leaf"));
+                    clusters.add(new Cluster(Integer.toString(Integer.parseInt((clusters.stream().max(Comparator.comparing(c -> c.label))).get().label) + 1),
+                            Stream.concat(cluster.rules.stream(), Stream.of(attribute + " != " + split.value)).collect(Collectors.toList()), subset2, "Leaf"));
+                }
+            }
+            else{
+                cluster.clusterType = "Closed Leaf";
+            }
+        }
+    }
+
+    public static List<Correlation> getCorrelations(Itemset itemset, List<FeatureVector> fulfillments, List<FeatureVector> violations, Double supportThreshold, String ruleType){
+        clusters.clear();
+        computeEditDistances(fulfillments);
+        List<Correlation> correlations = new ArrayList<>();
+        clusters.add(new Cluster("1", new ArrayList<String>(), fulfillments, "Leaf"));
+        while(clusters.stream().anyMatch(cluster -> cluster.clusterType.equals("Leaf"))){
+            split(clusters.stream().filter(cluster -> cluster.clusterType.equals("Leaf")).collect(Collectors.toList()), supportThreshold, (fulfillments.size() + violations.size()));
+            List<Cluster> clustersTo = clusters.stream().filter(cl -> cl.clusterType.equals("Leaf") || cl.clusterType.equals("Closed Leaf")).
+                    collect(Collectors.toList());
+
+            List<String> violationRule = new ArrayList<>(Collections.singletonList("-"));
+            clustersTo.add(new Cluster("-", violationRule, violations, "Closed Leaf"));
+            clustersTo.forEach(Cluster::giveLabels);
+            List<FeatureVector> featureVectorsList = new ArrayList<FeatureVector>() { { addAll(fulfillments); addAll(violations); } };
+            List<Cluster> clustersFrom = DecisionTree.id3(featureVectorsList, 0.05);
+            for(Cluster clusterTo: clustersTo)
+                for(Cluster clusterFrom: clustersFrom)
+                if(clusterFrom.label.equals(clusterTo.label)){
+                    if(ruleType.equals("precedence") || ruleType.equals("chain precedence") || ruleType.equals("alternate precedence")){
+                        Collections.reverse(itemset.items);
+
+                        //correlations.add(new Correlation(itemset, clusterFrom.rules, clusterTo.rules));
+
+                        Correlation correlation = new Correlation(itemset, clusterFrom.rules, clusterTo.rules);
+                        correlations.add(new Correlation(correlation.from, correlation.to,
+                                correlation.simplifyConstraint(correlation.antecedent), correlation.simplifyConstraint(correlation.consequent)));
+                        Collections.reverse(itemset.items);
+                    }
+                    else{
+                        //correlations.add(new Correlation(itemset, clusterFrom.rules, clusterTo.rules));
+                        Correlation correlation = new Correlation(itemset, clusterFrom.rules, clusterTo.rules);
+                        //correlations.add(correlation);
+                        correlations.add(new Correlation(correlation.from, correlation.to,
+                              correlation.simplifyConstraint(correlation.antecedent), correlation.simplifyConstraint(correlation.consequent)));
+                    }
+                }
+        }
+        return getDistinctCorrelations(correlations);
+    }
+
+
+    /********* Experimental ********/
+    /*
+    public static List<Cluster> clustering(List<FeatureVector> featureVectorList, Double supportThreshold){
         partitions.clear();
         rules.clear();
 
         List<Cluster> clusters = new ArrayList<>();
-        partitioning(featureVectorList, new ArrayList<>(), n);
+        List<String> attributes = new ArrayList<String>() { { addAll(featureVectorList.get(0).from.keySet()); addAll(featureVectorList.get(0).to.keySet()); } };
+        partitioning(featureVectorList, new ArrayList<>(), supportThreshold, featureVectorList.size(), attributes);
         for(int i = 0; i < partitions.size(); i++)
-            clusters.add(new Cluster(String.valueOf(i), rules.get(i), partitions.get(i)));
+            clusters.add(new Cluster(String.valueOf(i), rules.get(i), partitions.get(i), ""));
         return clusters;
     }
 
-    public static void partitioning(List<FeatureVector> featureVectorList, List<String> rule, Integer n){
-        if(featureVectorList.size() > n){
-            String attribute = getBestAttribute(featureVectorList);
-            String split = getBestSplit(featureVectorList, attribute);
+    public static List<Correlation> createCorrelations(List<FeatureVector> featureVectorList, List<Cluster> clusters){
+        List<Correlation> correlations = new ArrayList<>();
+        for(Cluster cluster: clusters)
+        {
+            List<String> rulesTo = new ArrayList<>();
+            List<String> rulesFrom = new ArrayList<>();
+            for(String rule: cluster.rules){
+                String[] params = rule.split("\\s[<!>=]+\\s");
+                String attribute = params[0];
+                if(featureVectorList.get(0).from.containsKey(attribute))
+                    rulesFrom.add(rule);
+                if(featureVectorList.get(0).to.containsKey(attribute))
+                    rulesTo.add(rule);
+            }
+            correlations.add(new Correlation("SubmitLoanApplication", "AssessApplication", rulesFrom, rulesTo));
+        }
+        return correlations;
+    }
 
+    public static void partitioning(List<FeatureVector> featureVectorList, List<String> rule, Double supportThreshold, Integer totalAmount, List<String> attributes){
+        String attribute = getBestAttribute(featureVectorList, attributes);
+        String split = getBestSplit(featureVectorList, attribute);
+
+        partitions.add(featureVectorList);
+        rules.add(rule);
+
+        System.out.println(attribute + ": " + split + ", H = " + computeGain(featureVectorList, attribute, split));
+
+        if((double)featureVectorList.size()/totalAmount > supportThreshold && computeGain(featureVectorList, attribute, split) > 0.0){
             if(tryParseDouble(split)){
                 Double value = Double.parseDouble(split);
 
-                partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) <= value).
-                        collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " <= " + split)).
-                        collect(Collectors.toList()), n);
+                if(featureVectorList.get(0).to.containsKey(attribute)){
+                    List<FeatureVector> subset1 = featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) <= value).
+                            collect(Collectors.toList());
+                    List<FeatureVector> subset2 = featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) > value).
+                            collect(Collectors.toList());
 
-                partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) > value).
-                        collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).
-                        collect(Collectors.toList()), n);
+                    partitioning(subset1, Stream.concat(rule.stream(), Stream.of(attribute + " <= " + split)).collect(Collectors.toList()),
+                            supportThreshold, totalAmount, attributes.stream().filter(attr -> !attr.equals(attribute)).collect(Collectors.toList()));
+                    partitioning(subset2, Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).collect(Collectors.toList()),
+                            supportThreshold, totalAmount, attributes.stream().filter(attr -> !attr.equals(attribute)).collect(Collectors.toList()));
+                }
+                else{
+                    List<FeatureVector> subset1 = featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) <= value).
+                            collect(Collectors.toList());
+                    List<FeatureVector> subset2 = featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) > value).
+                            collect(Collectors.toList());
+
+                    partitioning(subset1, Stream.concat(rule.stream(), Stream.of(attribute + " <= " + split)).collect(Collectors.toList()),
+                            supportThreshold, totalAmount, attributes.stream().filter(attr -> !attr.equals(attribute)).collect(Collectors.toList()));
+                    partitioning(subset2, Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).collect(Collectors.toList()),
+                            supportThreshold, totalAmount, attributes.stream().filter(attr -> !attr.equals(attribute)).collect(Collectors.toList()));
+                }
+
             }
             else{
+                if(featureVectorList.get(0).to.containsKey(attribute)){
+                    List<FeatureVector> subset1 = featureVectorList.stream().filter(fv -> fv.to.get(attribute).equals(split)).
+                            collect(Collectors.toList());
+                    List<FeatureVector> subset2 = featureVectorList.stream().filter(fv -> !fv.to.get(attribute).equals(split)).
+                            collect(Collectors.toList());
 
-                partitioning(featureVectorList.stream().filter(fv -> fv.to.get(attribute).equals(split)).
-                        collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).
-                        collect(Collectors.toList()), n);
+                    partitioning(subset1, Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).collect(Collectors.toList()),
+                            supportThreshold, totalAmount, attributes.stream().filter(attr -> !attr.equals(attribute)).collect(Collectors.toList()));
+                    partitioning(subset2, Stream.concat(rule.stream(), Stream.of(attribute + " != " + split)).collect(Collectors.toList()),
+                            supportThreshold, totalAmount, attributes.stream().filter(attr -> !attr.equals(attribute)).collect(Collectors.toList()));
+                }
+                else{
+                    List<FeatureVector> subset1 = featureVectorList.stream().filter(fv -> fv.from.get(attribute).equals(split)).
+                            collect(Collectors.toList());
+                    List<FeatureVector> subset2 = featureVectorList.stream().filter(fv -> !fv.from.get(attribute).equals(split)).
+                            collect(Collectors.toList());
 
-                partitioning(featureVectorList.stream().filter(fv -> !fv.to.get(attribute).equals(split)).
-                        collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " != " + split)).
-                        collect(Collectors.toList()), n);
+                    partitioning(subset1, Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).collect(Collectors.toList()),
+                            supportThreshold, totalAmount, attributes.stream().filter(attr -> !attr.equals(attribute)).collect(Collectors.toList()));
+                    partitioning(subset2, Stream.concat(rule.stream(), Stream.of(attribute + " != " + split)).collect(Collectors.toList()),
+                            supportThreshold, totalAmount, attributes.stream().filter(attr -> !attr.equals(attribute)).collect(Collectors.toList()));
+                }
+
             }
         }
         else{
-            partitions.add(featureVectorList);
             rules.add(rule);
+            partitions.add(featureVectorList);
         }
     }
+    */
+
 
     public static double[][] constructDistanceMatrix(List<FeatureVector> featureVectorsList){
+        attrMax.clear();
+        attrMin.clear();
+
+        if(featureVectorsList.size() > 0){
+            for(String attribute: featureVectorsList.get(0).from.keySet()){
+                if(tryParseDouble(featureVectorsList.get(0).from.get(attribute))){
+                    attrMax.put(attribute,Collections.max(featureVectorsList.stream().map(fv -> Double.parseDouble(fv.from.get(attribute))).
+                            collect(Collectors.toList())));
+                    attrMin.put(attribute, Collections.min(featureVectorsList.stream().map(fv -> Double.parseDouble(fv.from.get(attribute))).
+                            collect(Collectors.toList())));
+                }
+            }
+            for(String attribute: featureVectorsList.get(0).to.keySet()){
+                if(tryParseDouble(featureVectorsList.get(0).to.get(attribute))){
+                    attrMax.put(attribute,Collections.max(featureVectorsList.stream().map(fv -> Double.parseDouble(fv.to.get(attribute))).
+                            collect(Collectors.toList())));
+                    attrMin.put(attribute, Collections.min(featureVectorsList.stream().map(fv -> Double.parseDouble(fv.to.get(attribute))).
+                            collect(Collectors.toList())));
+                }
+            }
+        }
         Integer N = featureVectorsList.size();
         double[][] distanceMatrix = new double[N][N];
         for(int i = 0; i < N; i++)
-            for(int j = 0; j < N; j++)
-                distanceMatrix[i][j] = computeDistance(featureVectorsList.get(i).to, featureVectorsList.get(j).to, featureVectorsList);
+            for(int j = 0; j < N; j++){
+                if(i == j)
+                    distanceMatrix[i][j] = 0;
+                else if(j > i)
+                    distanceMatrix[i][j] = computeDistance(featureVectorsList.get(i), featureVectorsList.get(j), featureVectorsList);
+                else
+                    distanceMatrix[i][j] = distanceMatrix[j][i];
+            }
         return distanceMatrix;
     }
 
@@ -70,95 +240,119 @@ public final class Clustering {
         for(int i = 0; i < N; i++)
             for(int j = 0; j < N; j++)
             {
-                double value = 1 - distanceMatrix[i][j]/getMaxValue(distanceMatrix);
-                if(value >= 0.0 && value <= 1.0)
-                    similarityMatrix[i][j] = value;
+                if(i == j)
+                    similarityMatrix[i][j] = 1;
+                else if(j > i){
+                    double value = 1 - distanceMatrix[i][j]/getMaxValue(distanceMatrix);
+                    if(value >= 0.0 && value <= 1.0)
+                        similarityMatrix[i][j] = value;
+                    else
+                        similarityMatrix[i][j] = 0;
+                }
                 else
-                    similarityMatrix[i][j] = 0;
+                    similarityMatrix[i][j] = similarityMatrix[j][i];
             }
         return similarityMatrix;
     }
 
-    public static double computeInhomogeneity(List<FeatureVector> featureVectorsList, String attribute){
+    public static double computeInhomogeneity(List<FeatureVector> featureVectorsList, String attribute) {
+        double H = 0.0;
+
         double[][] fullSimilarityMatrix = computeSimilarityMatrix(constructDistanceMatrix(featureVectorsList));
         List<FeatureVector> reducedFeatureVectorList = new ArrayList<>();
-        for(FeatureVector fv: featureVectorsList)
-        {
-            HashMap<String,String> to = new HashMap<>();
+        for (FeatureVector fv : featureVectorsList) {
+            HashMap<String, String> from = new HashMap<>();
+            HashMap<String, String> to = new HashMap<>();
+            fv.from.keySet().stream().filter(k -> !k.equals(attribute)).forEach(k -> from.put(k, fv.from.get(k)));
             fv.to.keySet().stream().filter(k -> !k.equals(attribute)).forEach(k -> to.put(k, fv.to.get(k)));
-            reducedFeatureVectorList.add(new FeatureVector(fv.from, to));
+
+            reducedFeatureVectorList.add(new FeatureVector(from, to));
         }
         double[][] reducedSimilarityMatrix = computeSimilarityMatrix(constructDistanceMatrix(reducedFeatureVectorList));
-        double H = 0.0;
-        for(int i = 0; i < fullSimilarityMatrix.length; i++)
-            for(int j = 0; j < fullSimilarityMatrix.length; j++)
+        for (int i = 0; i < fullSimilarityMatrix.length; i++)
+            for (int j = 0; j < fullSimilarityMatrix.length; j++) {
                 H += fullSimilarityMatrix[i][j] * (1 - reducedSimilarityMatrix[i][j]) + reducedSimilarityMatrix[i][j] * (1 - fullSimilarityMatrix[i][j]);
+            }
         return -H;
     }
 
     public static String getBestAttribute(List<FeatureVector> featureVectorList){
-        HashMap<String, Double> inhomogeneities = new HashMap<>();
-        for(String key: featureVectorList.get(0).to.keySet()){
-            inhomogeneities.put(key, computeInhomogeneity(featureVectorList, key));
-        }
-
-        Map.Entry<String, Double> max = null;
-        for (Map.Entry<String, Double> entry : inhomogeneities.entrySet()) {
-            if (max == null || max.getValue() < entry.getValue()) {
-                max = entry;
-            }
-        }
-        return max.getKey();
-    }
-
-    public static String getBestSplit(List<FeatureVector> featureVectorList, String attribute){
-
-        double Hd = computeInhomogeneity(featureVectorList, attribute);
-        double deltaH = 0.0;
-
-        if(tryParseDouble(featureVectorList.get(0).to.get(attribute))){
-            List<Double> values = featureVectorList.stream().map(fv -> Double.parseDouble(fv.to.get(attribute))).distinct().collect(Collectors.toList());
-            double bestSplit = values.get(0);
-            for(double value: values){
-                double H1 = computeInhomogeneity(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) > value).collect(Collectors.toList()), attribute);
-                double H2 = computeInhomogeneity(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) <= value).collect(Collectors.toList()), attribute);
-                if(deltaH < (H1 + H2 - Hd)){
-                    deltaH = H1 + H2 - Hd;
-                    bestSplit = value;
-                }
-            }
-            return String.valueOf(bestSplit);
+        if(featureVectorList.get(0).to.keySet().size() == 1){
+            System.out.println(featureVectorList.get(0).to.keySet().toString());
+            return featureVectorList.get(0).to.keySet().toString();
         }
         else{
-            List<String> values = featureVectorList.stream().map(fv -> fv.to.get(attribute)).distinct().collect(Collectors.toList());
-            String bestSplit = values.get(0);
-            for(String value: values){
-                double H1 = computeInhomogeneity(featureVectorList.stream().filter(fv -> fv.to.get(attribute).equals(value)).collect(Collectors.toList()), attribute);
-                double H2 = computeInhomogeneity(featureVectorList.stream().filter(fv -> !fv.to.get(attribute).equals(value)).collect(Collectors.toList()), attribute);
-                if(deltaH < (H1 + H2 - Hd)){
-                    deltaH = H1 + H2 - Hd;
-                    bestSplit = value;
+            HashMap<String, Double> inhomogeneities = new HashMap<>();
+            for(String key: featureVectorList.get(0).to.keySet()){
+                //System.out.println(key + ": " +  computeInhomogeneity(featureVectorList, key));
+                inhomogeneities.put(key, computeInhomogeneity(featureVectorList, key));
+            }
+
+            Map.Entry<String, Double> max = null;
+            for (Map.Entry<String, Double> entry : inhomogeneities.entrySet()) {
+                if (max == null || max.getValue() < entry.getValue()) {
+                    max = entry;
                 }
             }
-            return bestSplit;
+            return max.getKey();
         }
     }
 
-    public static double computeDistance(HashMap<String, String> payload1, HashMap<String, String> payload2, List<FeatureVector> featureVectorList){
-        double distance = 0.0;
-        for(String key: payload1.keySet()){
-            if(tryParseDouble(payload1.get(key)))
-                distance += computeDistance(Double.parseDouble(payload1.get(key)), Double.parseDouble(payload2.get(key)), getMaxValue(featureVectorList, key), getMinValue(featureVectorList, key));
-            else if(payload1.get(key).equalsIgnoreCase("true") || payload2.get(key).equalsIgnoreCase("false"))
-                distance += computeDistance(Boolean.valueOf(payload1.get(key)), Boolean.valueOf(payload2.get(key)));
-            else
-                distance += computeDistance(payload1.get(key), payload2.get(key));
+    public static Split getBestSplit(List<FeatureVector> featureVectorList, String attribute){
+        double deltaH = 0.0;
+        List<String> values = featureVectorList.stream().map(fv -> fv.to.get(attribute)).distinct().collect(Collectors.toList());
+        String bestSplit = values.get(0);
+        for(String value: values){
+            if(deltaH < computeGain(featureVectorList, attribute, value)){
+                deltaH = computeGain(featureVectorList, attribute, value);
+                bestSplit = value;
+            }
         }
-        return distance/payload1.size();
+        return new Split(bestSplit, deltaH);
+    }
+
+    public static double computeGain(List<FeatureVector> featureVectorList, String attribute, String split){
+        double Hd = computeInhomogeneity(featureVectorList, attribute);
+        if(tryParseDouble(split)){
+            double H1 = computeInhomogeneity(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) > Double.parseDouble(split)).collect(Collectors.toList()), attribute);
+            double H2 = computeInhomogeneity(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.to.get(attribute)) <= Double.parseDouble(split)).collect(Collectors.toList()), attribute);
+            return H1 + H2 - Hd;
+        }
+        else{
+            double H1 = computeInhomogeneity(featureVectorList.stream().filter(fv -> fv.to.get(attribute).equals(split)).collect(Collectors.toList()), attribute);
+            double H2 = computeInhomogeneity(featureVectorList.stream().filter(fv -> !fv.to.get(attribute).equals(split)).collect(Collectors.toList()), attribute);
+            return H1 + H2 - Hd;
+        }
+    }
+
+    public static double computeDistance(FeatureVector fv1, FeatureVector fv2, List<FeatureVector> featureVectorList){
+        double distance = 0.0;
+        for(String key: fv1.from.keySet()){
+            if(tryParseDouble(fv1.from.get(key)))
+                distance += computeDistance(Double.parseDouble(fv1.from.get(key)), Double.parseDouble(fv2.from.get(key)), attrMax.get(key), attrMin.get(key));
+            else if(fv1.from.get(key).equalsIgnoreCase("true") || fv1.from.get(key).equalsIgnoreCase("false"))
+                distance += computeDistance(Boolean.valueOf(fv1.from.get(key)), Boolean.valueOf(fv2.from.get(key)));
+            else{
+                StringPair pair = new StringPair(fv1.from.get(key), fv2.from.get(key));
+                distance += editDistances.get(pair);
+            }
+        }
+        for(String key: fv1.to.keySet()){
+            if(tryParseDouble(fv1.to.get(key)))
+                distance += computeDistance(Double.parseDouble(fv1.to.get(key)), Double.parseDouble(fv2.to.get(key)), attrMax.get(key), attrMin.get(key));
+            else if(fv1.to.get(key).equalsIgnoreCase("true") || fv1.to.get(key).equalsIgnoreCase("false"))
+                distance += computeDistance(Boolean.valueOf(fv1.to.get(key)), Boolean.valueOf(fv2.to.get(key)));
+            else
+            {
+                StringPair pair = new StringPair(fv1.to.get(key), fv2.to.get(key));
+                distance += editDistances.get(pair);
+            }
+        }
+        return distance/(fv1.from.size() + fv1.to.size());
     }
 
     public static double computeDistance(double value1, double value2, double max, double min){
-        double value = (Math.abs(value1 - value2))/(max - min);
+        double value = (Math.abs(value1 - value2))/(Math.abs(max - min));
         if(Double.isNaN(value))
             return 0.0;
         else
@@ -166,7 +360,7 @@ public final class Clustering {
     }
 
     public static double computeDistance(Boolean value1, Boolean value2){
-        if(value1 == value2) return 0.0;
+        if(value1.equals(value2)) return 0.0;
         else return 1.0;
     }
 
@@ -180,24 +374,28 @@ public final class Clustering {
     }
 
     public static Integer calculateEditDistance(String value1, String value2){
-        int edits[][]=new int[value1.length()+1][value2.length()+1];
-        for(int i=0;i<=value1.length();i++)
-            edits[i][0]=i;
-        for(int j=1;j<=value2.length();j++)
-            edits[0][j]=j;
-        for(int i=1;i<=value1.length();i++){
-            for(int j=1;j<=value2.length();j++){
-                int u=(value1.charAt(i-1)==value2.charAt(j-1)?0:1);
-                edits[i][j]=Math.min(
-                        edits[i-1][j]+1,
-                        Math.min(
-                                edits[i][j-1]+1,
-                                edits[i-1][j-1]+u
-                        )
-                );
+        if(value1.equals(value2))
+            return 0;
+        else{
+            int edits[][]=new int[value1.length()+1][value2.length()+1];
+            for(int i=0;i<=value1.length();i++)
+                edits[i][0]=i;
+            for(int j=1;j<=value2.length();j++)
+                edits[0][j]=j;
+            for(int i=1;i<=value1.length();i++){
+                for(int j=1;j<=value2.length();j++){
+                    int u=(value1.charAt(i-1)==value2.charAt(j-1)?0:1);
+                    edits[i][j]=Math.min(
+                            edits[i-1][j]+1,
+                            Math.min(
+                                    edits[i][j-1]+1,
+                                    edits[i-1][j-1]+u
+                            )
+                    );
+                }
             }
+            return edits[value1.length()][value2.length()];
         }
-        return edits[value1.length()][value2.length()];
     }
 
     public static double getMaxValue(double[][] matrix){
@@ -210,16 +408,6 @@ public final class Clustering {
             }
         }
         return maxValue;
-    }
-
-    public static double getMaxValue(List<FeatureVector> featureVectorList, String attribute){
-        List<Double> values = featureVectorList.stream().map(fv -> Double.parseDouble(fv.to.get(attribute))).collect(Collectors.toList());
-        return Collections.max(values);
-    }
-
-    public static double getMinValue(List<FeatureVector> featureVectorList, String attribute){
-        List<Double> values = featureVectorList.stream().map(fv -> Double.parseDouble(fv.to.get(attribute))).collect(Collectors.toList());
-        return Collections.min(values);
     }
 
     public static boolean tryParseDouble(String value){
@@ -236,6 +424,34 @@ public final class Clustering {
             for (int j = 0; j < matrix.length; j++)
                 System.out.print(aMatrix[j] + " ");
             System.out.println();
+        }
+    }
+
+    public static List<Correlation> getDistinctCorrelations(List<Correlation> correlations){
+        List<Correlation> distinctCorrelations = new ArrayList<>();
+        for(Correlation correlation: correlations){
+            if(distinctCorrelations.stream().noneMatch(cor -> cor.antecedent.equals(correlation.antecedent) && cor.consequent.equals(correlation.consequent)))
+                distinctCorrelations.add(correlation);
+        }
+        return distinctCorrelations;
+    }
+
+    public static void computeEditDistances(List<FeatureVector> featureVectorList){
+        for(String attribute: featureVectorList.get(0).from.keySet()){
+            if(!tryParseDouble(featureVectorList.get(0).from.get(attribute))){
+                List<String> values = featureVectorList.stream().map(fv -> fv.from.get(attribute)).distinct().collect(Collectors.toList());
+                for(int i = 0; i < values.size(); i++)
+                    for(int j = 0; j < values.size(); j++)
+                        editDistances.put(new StringPair(values.get(i), values.get(j)), computeDistance(values.get(i), values.get(j)));
+            }
+        }
+        for(String attribute: featureVectorList.get(0).to.keySet()){
+            if(!tryParseDouble(featureVectorList.get(0).to.get(attribute))){
+                List<String> values = featureVectorList.stream().map(fv -> fv.to.get(attribute)).distinct().collect(Collectors.toList());
+                for(int i = 0; i < values.size(); i++)
+                    for(int j = 0; j < values.size(); j++)
+                        editDistances.put(new StringPair(values.get(i), values.get(j)), computeDistance(values.get(i), values.get(j)));
+            }
         }
     }
 }

@@ -10,21 +10,37 @@ public final class DecisionTree {
     public static List<List<FeatureVector>> partitions = new ArrayList<>();
     public static List<List<String>> rules = new ArrayList<>();
 
-    public static List<Cluster> id3(List<FeatureVector> featureVectorList){
+    public static List<Cluster> id3(List<FeatureVector> featureVectorList, Double supportThreshold){
         partitions.clear();
         rules.clear();
 
         List<Cluster> clusters = new ArrayList<>();
-        partitioning(featureVectorList, new ArrayList<>());
+        partitioning(featureVectorList, new ArrayList<>(), featureVectorList.size(), supportThreshold);
 
-        for(int i = 0; i < partitions.size(); i++)
-            clusters.add(new Cluster(partitions.get(i).get(0).label, rules.get(i), partitions.get(i)));
+        for(int i = 0; i < partitions.size(); i++){
+            List<FeatureVector> temp = partitions.get(i);
+            HashMap<String, Integer> labelsCounts = new HashMap<>();
+            for(String label: temp.stream().map(fv -> fv.label).collect(Collectors.toList())){
+                if(labelsCounts.containsKey(label))
+                    labelsCounts.put(label, labelsCounts.get(label) + 1);
+                else
+                    labelsCounts.put(label, 1);
+            }
+            Integer max = labelsCounts.get(temp.get(0).label);
+            String bestLabel = temp.get(0).label;
+            for(String label: labelsCounts.keySet())
+                if(labelsCounts.get(label) > max){
+                    max = labelsCounts.get(label);
+                    bestLabel = label;
+                }
+            clusters.add(new Cluster(bestLabel, rules.get(i), partitions.get(i), ""));
+        }
         return clusters;
     }
 
-    public static void partitioning(List<FeatureVector> featureVectorList, List<String> rule) {
+    public static void partitioning(List<FeatureVector> featureVectorList, List<String> rule, Integer totalAmount, Double supportThreshold) {
         BestSplit bestSplit = getBestSplit(featureVectorList);
-        if(computeInformationGain(featureVectorList, bestSplit.attribute, bestSplit.value) == 0){
+        if(computeInformationGain(featureVectorList, bestSplit.attribute, bestSplit.value) == 0){ //|| (double)(featureVectorList.size()/totalAmount) < supportThreshold){
             partitions.add(featureVectorList);
             rules.add(rule);
         }
@@ -36,18 +52,18 @@ public final class DecisionTree {
                 Double value = Double.parseDouble(split);
                 partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) > value).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).
-                        collect(Collectors.toList()));
+                        collect(Collectors.toList()), totalAmount, supportThreshold);
                 partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) <= value).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " <= " + split)).
-                        collect(Collectors.toList()));
+                        collect(Collectors.toList()), totalAmount, supportThreshold);
             }
             else{
                 partitioning(featureVectorList.stream().filter(fv -> fv.from.get(attribute).equals(split)).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).
-                        collect(Collectors.toList()));
+                        collect(Collectors.toList()), totalAmount, supportThreshold);
                 partitioning(featureVectorList.stream().filter(fv -> !fv.from.get(attribute).equals(split)).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " != " + split)).
-                        collect(Collectors.toList()));
+                        collect(Collectors.toList()), totalAmount, supportThreshold);
             }
         }
     }

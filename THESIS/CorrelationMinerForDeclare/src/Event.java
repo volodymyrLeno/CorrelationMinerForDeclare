@@ -17,7 +17,8 @@ public class Event {
         this.timestamp = values[2];
         payload = new HashMap<>();
         for(int i = 3; i < values.length; i++)
-            payload.put(attributes.get(i), values[i]);
+            if(!values[i].equals(""))
+                payload.put(attributes.get(i), values[i]);
     }
 
     public Event(String caseID, String activityName, String timestamp) {

@@ -1,8 +1,9 @@
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Created by volodymyr leno on 23.01.2018.
@@ -20,60 +21,72 @@ public class Correlation {
         this.consequent = new ArrayList<>(consequent);
     }
 
-    public Double getConfidence(List<FeatureVector> featureVectorList){
-        List<FeatureVector> coverSet = featureVectorList.stream().filter(this::satisfyAntecedent).collect(Collectors.toList());
-        return (double)coverSet.stream().filter(this::satisfyConsequent).count()/coverSet.size();
+    public Correlation(String from, String to, List<String> antecedent, List<String> consequent){
+        this.from = from;
+        this.to = to;
+        this.antecedent = new ArrayList<>(antecedent);
+        this.consequent = new ArrayList<>(consequent);
+
     }
 
-    public Double getSupport(List<FeatureVector> featureVectorList){
-        return (double)featureVectorList.stream().filter(fv -> satisfyAntecedent(fv) && satisfyConsequent(fv)).collect(Collectors.toList()).size()/featureVectorList.size();
-    }
+    public List<String> simplifyConstraint(List<String> constraint){
+        if(constraint.get(0).equals("-"))
+            return constraint;
+        else {
+            HashMap<String, List<String>> simplifiedConstraints = new HashMap<>();
+            List<String> constraints = new ArrayList<>();
+            for (String rule : constraint) {
+                String[] params = rule.split("\\s[<!>=]+\\s");
+                String attribute = params[0];
 
-    public boolean satisfyAntecedent(FeatureVector featureVector){
-        for(String rule: antecedent){
-            Pattern pattern = Pattern.compile("[<!>=]+");
-            Matcher matcher = pattern.matcher(rule);
-            String operator = "";
-            if(matcher.find())
-                operator = matcher.group();
-
-            String[] params = rule.split("\\s[<!>=]+\\s");
-            String attribute = params[0];
-            String value = params[1];
-
-            switch(operator){
-                case "=": if(!featureVector.from.get(attribute).equals(value)) return false; break;
-                case "!=": if(featureVector.from.get(attribute).equals(value)) return  false; break;
-                case ">": if(Double.parseDouble(featureVector.from.get(attribute)) <= Double.parseDouble(value)) return false; break;
-                case "<=": if(Double.parseDouble(featureVector.from.get(attribute)) > Double.parseDouble((value))) return false; break;
-                default: break;
+                if (!simplifiedConstraints.containsKey(attribute))
+                    simplifiedConstraints.put(attribute, new ArrayList<>());
             }
-        }
-        return true;
-    }
 
-    public boolean satisfyConsequent(FeatureVector featureVector){
-        for(String rule: consequent){
+            for (String attribute : simplifiedConstraints.keySet()) {
+                HashMap<String, List<String>> operators = new HashMap<>();
+                for (String rule : constraint) {
+                    Pattern pattern = Pattern.compile("[<!>=]+");
+                    Matcher matcher = pattern.matcher(rule);
+                    String operator = "";
+                    if (matcher.find())
+                        operator = matcher.group();
 
-            Pattern pattern = Pattern.compile("[<!>=]+");
-            Matcher matcher = pattern.matcher(rule);
-            String operator = "";
-            if(matcher.find())
-                operator = matcher.group();
+                    String[] params = rule.split("\\s[<!>=]+\\s");
+                    String attr = params[0];
+                    String value = params[1];
 
-            String[] params = rule.split("\\s[<!>=]+\\s");
-            String attribute = params[0];
-            String value = params[1];
+                    if (attr.equals(attribute)) {
+                        if (operators.containsKey(operator))
+                            operators.get(operator).add(value);
+                        else
+                            operators.put(operator, new ArrayList<String>(Collections.singletonList(value)));
+                    }
+                }
+                for (String operator : operators.keySet()) {
+                    if (operator.equals(">"))
+                        simplifiedConstraints.get(attribute).add(attribute + " > " + operators.get(operator).stream().max(String::compareTo).get());
+                    else if (operator.equals("<="))
+                        simplifiedConstraints.get(attribute).add(attribute + " <= " + operators.get(operator).stream().min(String::compareTo).get());
+                    else if (operator.equals("!=")){
+                        if(operators.containsKey("="))
+                            simplifiedConstraints.get(attribute).add(attribute + " = " + operators.get("=").get(0));
+                        else{
+                            for(int i = 0; i < operators.get("!=").size(); i++)
+                                simplifiedConstraints.get(attribute).add(attribute + " != " + operators.get(operator).get(i));
+                        }
+                    }
+                    else{
+                        for(int i = 0; i < operators.get(operator).size(); i++)
+                            simplifiedConstraints.get(attribute).add(attribute + " " + operator + " " + operators.get(operator).get(i));
+                    }
+                }
 
-            switch(operator){
-                case "=": if(!featureVector.to.get(attribute).equals(value)) return false; break;
-                case "!=": if(featureVector.to.get(attribute).equals(value)) return  false; break;
-                case ">": if(Double.parseDouble(featureVector.to.get(attribute)) <= Double.parseDouble(value)) return false; break;
-                case "<=": if(Double.parseDouble(featureVector.to.get(attribute)) > Double.parseDouble((value))) return false; break;
-                default: break;
+                for (String rule : simplifiedConstraints.get(attribute))
+                    constraints.add(rule);
             }
+            return constraints;
         }
-        return true;
     }
 
     public String toString(){
