@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="CorrelationMinerForDeclare:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/CorrelationMinerForDeclare_jar</output-path>
+    <root id="archive" name="CorrelationMinerForDeclare.jar">
+      <element id="module-output" name="CorrelationMinerForDeclare" />
+    </root>
+  </artifact>
+</component>
