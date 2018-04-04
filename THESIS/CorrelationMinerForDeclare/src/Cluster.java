@@ -17,6 +17,13 @@ public class Cluster {
         this.clusterType = type;
     }
 
+    public Cluster(){
+        this.label = null;
+        this.rules = new ArrayList<>();
+        this.elements = new ArrayList<>();
+        this.clusterType = null;
+    }
+
     public void giveLabels(){
         for(FeatureVector element: elements)
             element.label = label;

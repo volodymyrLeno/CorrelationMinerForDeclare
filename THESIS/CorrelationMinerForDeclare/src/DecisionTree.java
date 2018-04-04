@@ -10,12 +10,12 @@ public final class DecisionTree {
     public static List<List<FeatureVector>> partitions = new ArrayList<>();
     public static List<List<String>> rules = new ArrayList<>();
 
-    public static List<Cluster> id3(List<FeatureVector> featureVectorList, Double supportThreshold){
+    public static List<Cluster> id3(List<FeatureVector> featureVectorList, Double supportThreshold, Boolean prunning){
         partitions.clear();
         rules.clear();
 
         List<Cluster> clusters = new ArrayList<>();
-        partitioning(featureVectorList, new ArrayList<>(), featureVectorList.size(), supportThreshold);
+        partitioning(featureVectorList, new ArrayList<>(), featureVectorList.size(), supportThreshold, prunning);
 
         for(int i = 0; i < partitions.size(); i++){
             List<FeatureVector> temp = partitions.get(i);
@@ -38,9 +38,11 @@ public final class DecisionTree {
         return clusters;
     }
 
-    public static void partitioning(List<FeatureVector> featureVectorList, List<String> rule, Integer totalAmount, Double supportThreshold) {
+    public static void partitioning(List<FeatureVector> featureVectorList, List<String> rule, Integer totalAmount, Double supportThreshold, Boolean prunning) {
+
         BestSplit bestSplit = getBestSplit(featureVectorList);
-        if(computeInformationGain(featureVectorList, bestSplit.attribute, bestSplit.value) == 0){ //|| (double)(featureVectorList.size()/totalAmount) < supportThreshold){
+
+        if(computeInformationGain(featureVectorList, bestSplit.attribute, bestSplit.value) == 0 || ((double) (featureVectorList.size()/totalAmount) < supportThreshold && prunning)){
             partitions.add(featureVectorList);
             rules.add(rule);
         }
@@ -52,21 +54,58 @@ public final class DecisionTree {
                 Double value = Double.parseDouble(split);
                 partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) > value).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).
-                        collect(Collectors.toList()), totalAmount, supportThreshold);
+                        collect(Collectors.toList()), totalAmount, supportThreshold, prunning);
                 partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) <= value).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " <= " + split)).
-                        collect(Collectors.toList()), totalAmount, supportThreshold);
+                        collect(Collectors.toList()), totalAmount, supportThreshold, prunning);
             }
             else{
                 partitioning(featureVectorList.stream().filter(fv -> fv.from.get(attribute).equals(split)).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).
-                        collect(Collectors.toList()), totalAmount, supportThreshold);
+                        collect(Collectors.toList()), totalAmount, supportThreshold, prunning);
                 partitioning(featureVectorList.stream().filter(fv -> !fv.from.get(attribute).equals(split)).
                         collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " != " + split)).
-                        collect(Collectors.toList()), totalAmount, supportThreshold);
+                        collect(Collectors.toList()), totalAmount, supportThreshold, prunning);
             }
         }
     }
+
+        /*
+        if(prunning)
+            if(computeInformationGain(featureVectorList, bestSplit.attribute, bestSplit.value) == 0 || (double)(featureVectorList.size()/totalAmount) < supportThreshold){
+                partitions.add(featureVectorList);
+                rules.add(rule);
+            }
+        else{
+            if(computeInformationGain(featureVectorList, bestSplit.attribute, bestSplit.value) == 0){
+                partitions.add(featureVectorList);
+                rules.add(rule);
+            }
+            else{
+                String attribute = bestSplit.attribute;
+                String split = bestSplit.value;
+
+                if(tryParseDouble(split)){
+                    Double value = Double.parseDouble(split);
+                    partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) > value).
+                            collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).
+                            collect(Collectors.toList()), totalAmount, supportThreshold, prunnnig);
+                    partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) <= value).
+                            collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " <= " + split)).
+                            collect(Collectors.toList()), totalAmount, supportThreshold, prunnnig);
+                }
+                else{
+                    partitioning(featureVectorList.stream().filter(fv -> fv.from.get(attribute).equals(split)).
+                            collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).
+                            collect(Collectors.toList()), totalAmount, supportThreshold, prunnnig);
+                    partitioning(featureVectorList.stream().filter(fv -> !fv.from.get(attribute).equals(split)).
+                            collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " != " + split)).
+                            collect(Collectors.toList()), totalAmount, supportThreshold, prunnnig);
+                }
+            }
+            }
+            */
+    //}
 
     public static HashMap<String, Double> getProbabilities(List<FeatureVector> featureVectorList){
         HashMap<String, Double> probabilities = new HashMap<>();

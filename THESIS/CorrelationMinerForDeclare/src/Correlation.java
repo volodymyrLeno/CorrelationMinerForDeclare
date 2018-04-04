@@ -30,7 +30,7 @@ public class Correlation {
     }
 
     public List<String> simplifyConstraint(List<String> constraint){
-        if(constraint.get(0).equals("-"))
+        if(constraint.size() == 0 || constraint.get(0).equals("-"))
             return constraint;
         else {
             HashMap<String, List<String>> simplifiedConstraints = new HashMap<>();

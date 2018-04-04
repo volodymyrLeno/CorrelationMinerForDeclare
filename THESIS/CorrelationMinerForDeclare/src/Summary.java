@@ -166,7 +166,7 @@ public final class Summary {
             return(double)featureVectorList.stream().filter(fv -> ruleSatisfaction(fv.from, correlation.antecedent) && fv.to == null).collect(Collectors.toList()).size()/activationFrequency;
         else
             return (double)featureVectorList.stream().filter(fv -> fv.from != null && fv.to != null).filter(fv -> ruleSatisfaction(fv.from, correlation.antecedent) &&
-                ruleSatisfaction(fv.to, correlation.consequent)).collect(Collectors.toList()).size()/activationFrequency;
+                    ruleSatisfaction(fv.to, correlation.consequent)).collect(Collectors.toList()).size()/activationFrequency;
     }
 
     static double getConfidence(HashMap<String, List<Event>> cases, List<FeatureVector> featureVectorList, Correlation correlation){
@@ -200,7 +200,15 @@ public final class Summary {
             String attribute = params[0];
             String value = params[1];
             switch(operator){
-                case "=": if(!payload.get(attribute).equals(value)) return false; break;
+                case "=": {
+                    if (Clustering.isRange(value)){
+                        String[] values1 = value.split("-");
+                        String[] values2 = payload.get(attribute).split("-");
+                        if(Double.parseDouble(values1[0]) > Double.parseDouble(values2[0]) || Double.parseDouble(values1[1]) < Double.parseDouble(values2[1]))
+                            return false;
+                    }
+                    else if(!payload.get(attribute).equals(value)) return false;
+                } break;
                 case "!=": if(payload.get(attribute).equals(value)) return  false; break;
                 case ">": if(Double.parseDouble(payload.get(attribute)) <= Double.parseDouble(value)) return false; break;
                 case "<=": if(Double.parseDouble(payload.get(attribute)) > Double.parseDouble((value))) return false; break;
