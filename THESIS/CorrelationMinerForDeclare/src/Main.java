@@ -44,9 +44,6 @@ public class Main {
             double clusteringTime = 0.0;
             double classificationTime = 0.0;
 
-
-            //boolean perform = false;
-
             for (Itemset itemset : fulfillments.keySet())
                 if (fulfillments.get(itemset).get(0).from.size() > 0 && fulfillments.get(itemset).get(0).to.size() > 0) {
 
@@ -87,7 +84,7 @@ public class Main {
                     List<String> violationRule = new ArrayList<>(Collections.singletonList("-"));
                     clusters.add(new Cluster("-", violationRule, violations.get(itemset), "Closed Leaf"));
 
-                    List<FeatureVector> featureVectorsList = new ArrayList<FeatureVector>() {
+                    List<FeatureVector> featureVectorsList = new ArrayList<>() {
                         {
                             addAll(featureVectors.stream().filter(fv -> fv.label!=null).collect(Collectors.toList()));
                             addAll(violations.get(itemset));
@@ -137,17 +134,12 @@ public class Main {
                                     }
                                 }
 
-                        for(Correlation correlation: correlations)
-                        {
+                        for(Correlation correlation: correlations) {
                             double support = Summary.getRelativeSupport(cases, featureVectorsList, correlation);
                             double confidence = Summary.getConfidence(cases, featureVectorsList, correlation);
                             //if(support > 0.1 && confidence > 0.6)
-                                System.out.println(correlation + ", sup = " + support + ", conf = " + confidence);
+                            System.out.println(correlation + ", sup = " + support + ", conf = " + confidence);
                         }
-                        /*
-                           System.out.println(correlation + ", sup = " + Summary.getRelativeSupport(cases, featureVectorsList, correlation)
-                        + ", conf = " + Summary.getConfidence(cases, featureVectorsList, correlation));
-                        */
                     }
             }
             long stop = System.currentTimeMillis();
@@ -422,7 +414,6 @@ public class Main {
                     for (Integer i1 : idx1)
                         if (i2 > i1) {
                             pattern.add(new FeatureVector((cases.get(key).get(i2)), cases.get(key).get(i1)));
-                            //pattern.add(new FeatureVector(cases.get(key).get(i1), cases.get(key).get(i2)));
                             break;
                         }
             });

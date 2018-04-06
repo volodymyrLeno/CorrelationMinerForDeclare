@@ -76,18 +76,13 @@ public final class Clustering {
                 if(clusterFrom.label.equals(clusterTo.label)){
                     if(ruleType.equals("precedence") || ruleType.equals("chain precedence") || ruleType.equals("alternate precedence")){
                         Collections.reverse(itemset.items);
-
-                        //correlations.add(new Correlation(itemset, clusterFrom.rules, clusterTo.rules));
-
                         Correlation correlation = new Correlation(itemset, clusterFrom.rules, clusterTo.rules);
                         correlations.add(new Correlation(correlation.from, correlation.to,
                                 correlation.simplifyConstraint(correlation.antecedent), correlation.simplifyConstraint(correlation.consequent)));
                         Collections.reverse(itemset.items);
                     }
                     else{
-                        //correlations.add(new Correlation(itemset, clusterFrom.rules, clusterTo.rules));
                         Correlation correlation = new Correlation(itemset, clusterFrom.rules, clusterTo.rules);
-                        //correlations.add(correlation);
                         correlations.add(new Correlation(correlation.from, correlation.to,
                               correlation.simplifyConstraint(correlation.antecedent), correlation.simplifyConstraint(correlation.consequent)));
                     }
