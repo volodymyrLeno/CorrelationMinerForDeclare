@@ -60,7 +60,7 @@ public final class correlationMiner {
 
                     if(featureVectorsList.size() > 0)
                     {
-                        List<Cluster> clustersFrom = DecisionTree.id3(featureVectorsList, supportThreshold, prunning);
+                        List<Cluster> clustersFrom = DecisionTree.classification(featureVectorsList, supportThreshold, prunning);
 
                         List<Correlation> correlations = new ArrayList<>();
 

@@ -10,7 +10,7 @@ public final class DecisionTree {
     private static List<List<FeatureVector>> partitions = new ArrayList<>();
     private static List<List<String>> rules = new ArrayList<>();
 
-    public static List<Cluster> id3(List<FeatureVector> featureVectorList, Double supportThreshold, Boolean prunning){
+    public static List<Cluster> classification(List<FeatureVector> featureVectorList, Double supportThreshold, Boolean prunning){
         partitions.clear();
         rules.clear();
 
