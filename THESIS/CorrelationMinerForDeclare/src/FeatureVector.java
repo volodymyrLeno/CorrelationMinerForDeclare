@@ -10,13 +10,13 @@ public class FeatureVector {
     HashMap<String,String> to;
     String label;
 
-    public FeatureVector(Event from, Event to){
+    FeatureVector(Event from, Event to){
         this.from = from.payload;
         this.to = to.payload;
         this.label = null;
     }
 
-    public FeatureVector(HashMap<String, String> from, HashMap<String,String> to){
+    FeatureVector(HashMap<String, String> from, HashMap<String, String> to){
         this.from = new HashMap<>();
         this.to = new HashMap<>();
         for(String attribute: from.keySet())

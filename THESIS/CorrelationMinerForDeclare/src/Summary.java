@@ -177,7 +177,7 @@ public final class Summary {
                     activations.add(event);
         }
         Integer coverage = activations.stream().filter(fv -> ruleSatisfaction(fv.payload, correlation.antecedent)).collect(Collectors.toList()).size();
-        Integer ruleFrequency = 0;
+        Integer ruleFrequency;
         if(correlation.consequent.get(0).equals("-"))
             ruleFrequency = featureVectorList.stream().filter(fv -> ruleSatisfaction(fv.from, correlation.antecedent) &&
                     fv.to == null).collect(Collectors.toList()).size();
@@ -201,7 +201,7 @@ public final class Summary {
             String value = params[1];
             switch(operator){
                 case "=": {
-                    if (Clustering.isRange(value)){
+                    if (isRange(value)){
                         String[] values1 = value.split("-");
                         String[] values2 = payload.get(attribute).split("-");
                         if(Double.parseDouble(values1[0]) > Double.parseDouble(values2[0]) || Double.parseDouble(values1[1]) < Double.parseDouble(values2[1]))
@@ -216,5 +216,10 @@ public final class Summary {
             }
         }
         return true;
+    }
+
+    private static boolean isRange(String value){
+        String[] values = value.split("-");
+        return values.length == 2 && correlationMiner.tryParseDouble(values[0]) && correlationMiner.tryParseDouble(values[1]);
     }
 }

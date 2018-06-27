@@ -5,7 +5,7 @@ public class Split {
     String value;
     double gain;
 
-    public Split(String value, double gain){
+    Split(String value, double gain){
         this.value = value;
         this.gain = gain;
     }

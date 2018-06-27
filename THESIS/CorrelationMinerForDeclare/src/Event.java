@@ -8,10 +8,10 @@ import java.util.List;
 public class Event {
     String caseID;
     String activityName;
-    String timestamp;
+    private String timestamp;
     HashMap<String, String> payload;
 
-    public Event(List<String> attributes, String[] values){
+    Event(List<String> attributes, String[] values){
         this.caseID = values[0];
         this.activityName = values[1];
         this.timestamp = values[2];

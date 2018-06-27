@@ -14,14 +14,14 @@ public class Correlation {
     List<String> antecedent;
     List<String> consequent;
 
-    public Correlation(Itemset itemset, List<String> antecedent, List<String> consequent){
+    Correlation(Itemset itemset, List<String> antecedent, List<String> consequent){
         this.from = itemset.items.get(0);
         this.to = itemset.items.get(1);
         this.antecedent = new ArrayList<>(antecedent);
         this.consequent = new ArrayList<>(consequent);
     }
 
-    public Correlation(String from, String to, List<String> antecedent, List<String> consequent){
+    Correlation(String from, String to, List<String> antecedent, List<String> consequent){
         this.from = from;
         this.to = to;
         this.antecedent = new ArrayList<>(antecedent);
@@ -60,30 +60,37 @@ public class Correlation {
                         if (operators.containsKey(operator))
                             operators.get(operator).add(value);
                         else
-                            operators.put(operator, new ArrayList<String>(Collections.singletonList(value)));
+                            operators.put(operator, new ArrayList<>(Collections.singletonList(value)));
                     }
                 }
                 for (String operator : operators.keySet()) {
-                    if (operator.equals(">"))
-                        simplifiedConstraints.get(attribute).add(attribute + " > " + operators.get(operator).stream().max(String::compareTo).get());
-                    else if (operator.equals("<="))
-                        simplifiedConstraints.get(attribute).add(attribute + " <= " + operators.get(operator).stream().min(String::compareTo).get());
-                    else if (operator.equals("!=")){
-                        if(operators.containsKey("="))
-                            simplifiedConstraints.get(attribute).add(attribute + " = " + operators.get("=").get(0));
-                        else{
-                            for(int i = 0; i < operators.get("!=").size(); i++)
-                                simplifiedConstraints.get(attribute).add(attribute + " != " + operators.get(operator).get(i));
-                        }
-                    }
-                    else{
-                        for(int i = 0; i < operators.get(operator).size(); i++)
-                            simplifiedConstraints.get(attribute).add(attribute + " " + operator + " " + operators.get(operator).get(i));
+                    switch (operator) {
+                        case ">":
+                            simplifiedConstraints.get(attribute).add(attribute + " > " + operators.get(operator).stream().max(String::compareTo).get());
+
+                            break;
+                        case "<=":
+                            simplifiedConstraints.get(attribute).add(attribute + " <= " + operators.get(operator).stream().min(String::compareTo).get());
+
+                            break;
+                        case "!=":
+                            if (operators.containsKey("="))
+                                simplifiedConstraints.get(attribute).add(attribute + " = " + operators.get("=").get(0));
+                            else {
+                                for (int i = 0; i < operators.get("!=").size(); i++)
+                                    simplifiedConstraints.get(attribute).add(attribute + " != " + operators.get(operator).get(i));
+                            }
+
+                            break;
+                        default:
+                            for (int i = 0; i < operators.get(operator).size(); i++)
+                                simplifiedConstraints.get(attribute).add(attribute + " " + operator + " " + operators.get(operator).get(i));
+
+                            break;
                     }
                 }
 
-                for (String rule : simplifiedConstraints.get(attribute))
-                    constraints.add(rule);
+                constraints.addAll(simplifiedConstraints.get(attribute));
             }
             return constraints;
         }

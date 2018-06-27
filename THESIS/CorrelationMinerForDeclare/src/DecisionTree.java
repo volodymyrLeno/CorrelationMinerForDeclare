@@ -7,8 +7,8 @@ import java.util.stream.Stream;
  */
 public final class DecisionTree {
 
-    public static List<List<FeatureVector>> partitions = new ArrayList<>();
-    public static List<List<String>> rules = new ArrayList<>();
+    private static List<List<FeatureVector>> partitions = new ArrayList<>();
+    private static List<List<String>> rules = new ArrayList<>();
 
     public static List<Cluster> id3(List<FeatureVector> featureVectorList, Double supportThreshold, Boolean prunning){
         partitions.clear();
@@ -38,7 +38,7 @@ public final class DecisionTree {
         return clusters;
     }
 
-    public static void partitioning(List<FeatureVector> featureVectorList, List<String> rule, Integer totalAmount, Double supportThreshold, Boolean prunning) {
+    private static void partitioning(List<FeatureVector> featureVectorList, List<String> rule, Integer totalAmount, Double supportThreshold, Boolean prunning) {
 
         BestSplit bestSplit = getBestSplit(featureVectorList);
 
@@ -70,44 +70,7 @@ public final class DecisionTree {
         }
     }
 
-        /*
-        if(prunning)
-            if(computeInformationGain(featureVectorList, bestSplit.attribute, bestSplit.value) == 0 || (double)(featureVectorList.size()/totalAmount) < supportThreshold){
-                partitions.add(featureVectorList);
-                rules.add(rule);
-            }
-        else{
-            if(computeInformationGain(featureVectorList, bestSplit.attribute, bestSplit.value) == 0){
-                partitions.add(featureVectorList);
-                rules.add(rule);
-            }
-            else{
-                String attribute = bestSplit.attribute;
-                String split = bestSplit.value;
-
-                if(tryParseDouble(split)){
-                    Double value = Double.parseDouble(split);
-                    partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) > value).
-                            collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " > " + split)).
-                            collect(Collectors.toList()), totalAmount, supportThreshold, prunnnig);
-                    partitioning(featureVectorList.stream().filter(fv -> Double.parseDouble(fv.from.get(attribute)) <= value).
-                            collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " <= " + split)).
-                            collect(Collectors.toList()), totalAmount, supportThreshold, prunnnig);
-                }
-                else{
-                    partitioning(featureVectorList.stream().filter(fv -> fv.from.get(attribute).equals(split)).
-                            collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " = " + split)).
-                            collect(Collectors.toList()), totalAmount, supportThreshold, prunnnig);
-                    partitioning(featureVectorList.stream().filter(fv -> !fv.from.get(attribute).equals(split)).
-                            collect(Collectors.toList()), Stream.concat(rule.stream(), Stream.of(attribute + " != " + split)).
-                            collect(Collectors.toList()), totalAmount, supportThreshold, prunnnig);
-                }
-            }
-            }
-            */
-    //}
-
-    public static HashMap<String, Double> getProbabilities(List<FeatureVector> featureVectorList){
+    private static HashMap<String, Double> getProbabilities(List<FeatureVector> featureVectorList){
         HashMap<String, Double> probabilities = new HashMap<>();
         for(String label: featureVectorList.stream().map(featureVector -> featureVector.label).collect(Collectors.toList())){
             if(!probabilities.containsKey(label))
@@ -120,7 +83,7 @@ public final class DecisionTree {
         return probabilities;
     }
 
-    public static double computeEntropy(List<FeatureVector> featureVectorList){
+    private static double computeEntropy(List<FeatureVector> featureVectorList){
         if(featureVectorList == null) return 0;
         HashMap<String, Double> probabilities = getProbabilities(featureVectorList);
         Double entropy = 0.0;
@@ -129,7 +92,7 @@ public final class DecisionTree {
         return -entropy;
     }
 
-    public static double computeInformationGain(List<FeatureVector> featureVectorList, String attribute, String split){
+    private static double computeInformationGain(List<FeatureVector> featureVectorList, String attribute, String split){
         double Entropy = computeEntropy(featureVectorList);
 
         if(tryParseDouble(split)){
@@ -145,7 +108,7 @@ public final class DecisionTree {
         }
     }
 
-    public static BestSplit getBestSplit(List<FeatureVector> featureVectorList){
+    private static BestSplit getBestSplit(List<FeatureVector> featureVectorList){
         HashMap<String, String> split = new HashMap<>();
         HashMap<String, Double> infGain = new HashMap<>();
         for(String attribute: featureVectorList.get(0).from.keySet()){
@@ -168,7 +131,7 @@ public final class DecisionTree {
         return new BestSplit(bestAttribute, bestThreshold);
     }
 
-    public static boolean tryParseDouble(String value){
+    private static boolean tryParseDouble(String value){
         try{
             Double.parseDouble(value);
             return true;
@@ -182,7 +145,7 @@ class BestSplit{
     String attribute;
     String value;
 
-    public BestSplit(String attribute, String value){
+    BestSplit(String attribute, String value){
         this.attribute = attribute;
         this.value = value;
     }

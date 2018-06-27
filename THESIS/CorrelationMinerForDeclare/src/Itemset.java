@@ -7,9 +7,9 @@ import java.util.List;
 
 public class Itemset {
     List<String> items;
-    Integer frequency;
+    private Integer frequency;
 
-    public Itemset(List<String> items, Integer frequency){
+    Itemset(List<String> items, Integer frequency){
         this.items = new ArrayList<>(items);
         this.frequency = frequency;
     }

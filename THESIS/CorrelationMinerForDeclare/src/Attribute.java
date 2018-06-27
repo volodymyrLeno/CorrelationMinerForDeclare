@@ -5,7 +5,7 @@ public class Attribute {
     String value;
     Double inhomogeneity;
 
-    public Attribute(String value, Double inhomogeneity){
+    Attribute(String value, Double inhomogeneity){
         this.value = value;
         this.inhomogeneity = inhomogeneity;
     }

@@ -10,14 +10,14 @@ public class Cluster {
     List<FeatureVector> elements;
     String clusterType;
 
-    public Cluster(String label, List<String> rules, List<FeatureVector> elements, String type){
+    Cluster(String label, List<String> rules, List<FeatureVector> elements, String type){
         this.label = label;
         this.rules = new ArrayList<>(rules);
         this.elements = new ArrayList<>(elements);
         this.clusterType = type;
     }
 
-    public Cluster(){
+    Cluster(){
         this.label = null;
         this.rules = new ArrayList<>();
         this.elements = new ArrayList<>();

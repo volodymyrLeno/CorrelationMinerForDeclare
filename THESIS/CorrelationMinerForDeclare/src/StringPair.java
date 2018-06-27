@@ -5,10 +5,10 @@ import java.util.Objects;
  * Created by volodymyr leno on 08.03.2018.
  */
 public class StringPair implements Comparator<StringPair> {
-    String value1;
-    String value2;
+    private String value1;
+    private String value2;
 
-    public StringPair(String v1, String v2){
+    StringPair(String v1, String v2){
         value1 = v1;
         value2 = v2;
     }
